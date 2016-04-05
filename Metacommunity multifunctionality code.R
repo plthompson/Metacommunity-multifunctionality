@@ -1,10 +1,10 @@
-#required packages####
-require(ggplot2)
-require(RColorBrewer)
-require(plotrix)
-require(plyr)
-require(dplyr)
-require(vegan)
+#libraryd packages####
+library(ggplot2)
+library(RColorBrewer)
+library(plotrix)
+library(plyr)
+library(dplyr)
+library(vegan)
 
 #function for calculating abundance of species in the model#####
 SIH<-function(species=9,dispersal=0.01, patches=30){
@@ -329,4 +329,3 @@ ggplot(data=Thresh.df_All,aes(x=Div,y=x, group=Scale))+
   scale_x_continuous(breaks=c(0,3,6,9))+
   coord_cartesian()+
   theme(aspect.ratio=1)
-
