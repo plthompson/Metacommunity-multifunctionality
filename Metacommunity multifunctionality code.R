@@ -5,6 +5,10 @@ library(plotrix)
 library(plyr)
 library(dplyr)
 library(vegan)
+library(ggExtra)
+library(gridExtra)
+library(cowplot)
+library(tidyr)
 
 #function for calculating abundance of species in the model#####
 SIH<-function(species=9,dispersal=0.01, patches=30){
@@ -110,7 +114,7 @@ FuncMaxSDfuns<-function(adf,Local.max=NA,Reg.max=NA, threshmin=0.1,threshmax=2,t
 ####
 
 #Metacommunity multifunctionality simulation####
-runs<-5 #number of replicates
+runs<-50 #number of replicates
 species<-9 #number of species
 patches<-30 #number of patches
 functions<-7 #number of functions
@@ -170,6 +174,8 @@ for(r in 1:runs){
   setTxtProgressBar(pb, r) #progress bar
 }
 
+options(scipen=999)
+
 #Data processing#####
 #calculate means and SD of multifunction
 Reg_Multifunc_means<-aggregate(FuncMaxed.DF$RfuncMaxed,by=list(Prop.Cont=FuncMaxed.DF$prop.cont,Threshold=FuncMaxed.DF$threshold,Dispersal=FuncMaxed.DF$dispersal),mean)
@@ -191,50 +197,65 @@ CV1.df$local.sd<-aggregate(CV1$Local,by = list(Dispersal=CV1$dispersal,Prop.Cont
 CV1.df$regional<-aggregate(CV1$Regional,by = list(Dispersal=CV1$dispersal,Prop.Cont=CV1$prop.cont),mean, na.rm=T)$x
 CV1.df$regional.sd<-aggregate(CV1$Regional,by = list(Dispersal=CV1$dispersal,Prop.Cont=CV1$prop.cont),sd, na.rm=T)$x
 
+CV.df<-gather(CV1.df,key = Scale,value=CV,local,regional)[,-c(3:4)]
+CV.df$sd<-gather(CV1.df,key = Scale,value=SD,local.sd,regional.sd)[,6]
 
 #calculate species diversity and biomass
-L.Div<-R.Div<-RFun1<-R.SR<-L.SR<-NA
 for(i in 1:length(DispV)){
-  L.SR[i]<-mean(apply(SIH_data[["Abund",i]]>0,3,rowSums))
-  L.Div[i]<-mean(exp(apply(SIH_data[["Abund",i]],3,diversity)))
-  R.SR[i]<-sum(rowSums(SIH_data[["Abund",i]][80,,]>0)>0)
-  R.Div[i]<-mean(exp(diversity(apply(SIH_data[["Abund",i]],1,rowSums),MARGIN = 2)))
-  RFun1[i]<-mean(apply(SIH_data[["Abund",i]],3,rowSums))/functions
-}
+  hold.df<-data.frame(Diversity=c(mean(exp(apply(SIH_data[["Abund",i]],3,diversity))),mean(exp(diversity(apply(SIH_data[["Abund",i]],1,rowSums),MARGIN = 2)))),
+             Function1=mean(apply(SIH_data[["Abund",i]],1,colSums))/functions,
+             Scale=c("Local","Regional"),Dispersal=DispV[i])
+if(i==1){
+  Diversity.df<-hold.df
+} else{Diversity.df<-rbind(Diversity.df,hold.df)}
+  }
 
 #Figures####
-cex.labV<-1.2
 #Figure 1####
-par(mfrow=c(1,3), mar=c(5,5,2,2),las = 1, pty='s')
-plot(R.Div~DispV, log='x', type='l', lwd=3,col="1" ,lty=1, ylab="Effective species diversity", xlab="",cex.lab=cex.labV,xaxt='n')
-lines(L.Div~DispV, lwd=3,lty=2)
-#axis(1,at=c(seq(0.0002,0.0009,0.0001),seq(0.002,0.009,0.001),seq(0.02,0.09,0.01),seq(0.2,0.9,0.1)),tcl=-0.3,labels=F)
-axis(1,at=c(0.0001,0.001,0.01,0.1,1),labels=c("0.0001","0.001","0.01","0.1","1"))
-#lines(R.Div~DispV, lwd=3, lty=1, col=8)
-#lines(L.Div~DispV, lwd=3, lty=2, col=8)
-legend("topleft",c("Local", "Regional"), lty=c(2,1), col=c(1,1,1,8),lwd=2.25, bty='n')
-mtext("(a)", adj=-0.19)
+p1<-ggplot(Diversity.df,aes(x=Dispersal,y=Diversity,group=Scale, linetype=Scale))+
+  geom_line(size=1)+
+  scale_x_log10(breaks=c(0.0001,0.001,0.01,0.1,1),labels=c("0.0001","0.001","0.01","0.1","1"))+
+  theme_bw(base_size = 15)+
+  theme(legend.justification=c(0,0), legend.position=c(0,0.75))+
+  removeGrid()+
+  ylab("Effective species diversity")
 
-plot(RFun1*functions ~ DispV, type='l', log='x', lwd=3,lty=2, col=1, ylab="Local community biomass", xlab="Dispersal",cex.lab=cex.labV,xaxt='n')
-mtext("(b)", adj=-0.19)
-#axis(1,at=c(seq(0.0002,0.0009,0.0001),seq(0.002,0.009,0.001),seq(0.02,0.09,0.01),seq(0.2,0.9,0.1)),tcl=-0.3,labels=F)
-axis(1,at=c(0.0001,0.001,0.01,0.1,1),labels=c("0.0001","0.001","0.01","0.1","1"))
+p2<-ggplot(Diversity.df,aes(x=Dispersal,y=Function1,group=Scale, linetype=Scale))+
+  geom_line(size=1)+
+  scale_x_log10(breaks=c(0.0001,0.001,0.01,0.1,1),labels=c("0.0001","0.001","0.01","0.1","1"))+
+  theme_bw(base_size = 15)+
+  theme(legend.position="none")+
+  removeGrid()+
+  ylab("Local community biomass")
+
+p3<-ggplot(CV.df,aes(x=Dispersal,y=CV,group=interaction(Scale,Prop.Cont), linetype=Scale, color=factor(Prop.Cont,ordered = T)))+
+  geom_line(size=1)+
+  geom_errorbar(aes(ymax=CV+sd, ymin=CV-sd))+
+  scale_color_manual(values = grey(seq(0.8,0,length=5)),name="Functional\noverlap")+
+  scale_x_log10(breaks=c(0.0001,0.001,0.01,0.1,1),labels=c("0.0001","0.001","0.01","0.1","1"))+
+  theme_bw(base_size = 15)+
+  guides(linetype=F)+
+  removeGrid()+
+  theme(legend.justification=c(0,0), legend.position=c(0,0.5))+
+  ylab("Individual function CV")
+
+pdf(file = "Figure 1.pdf",height = 4.5, width=15.5)
+plot_grid(p1,p2,p3, labels=c("(a)", "(b)","(c)"), ncol = 3, nrow = 1)
+dev.off()
 
 
-plot(CV1.df$local[CV1.df$Prop.Cont==0.1] ~ DispV, type='n', ylim=c(0,1.7), log='x', ylab="Individual function CV", xlab="", cex.lab=cex.labV,xaxt='n')
-for(i in length(Prop.Cont):1){
-  hold<-CV1.df[CV1.df$Prop.Cont==Prop.Cont[i],]
-  plotCI(DispV,hold$local,uiw=hold$local.sd, log='x', pch=19, add=T, col=grey(seq(0,.8, by=0.8/(length(Prop.Cont)-1))[i]))
-  lines(DispV,hold$local, lwd=3, lty=2,col=grey(seq(0,.8, by=0.8/(length(Prop.Cont)-1))[i]))
-  plotCI(DispV,hold$regional,uiw=hold$regional.sd, log='x', pch=19,add=T,col=grey(seq(0,.8, by=0.8/(length(Prop.Cont)-1))[i]))
-  lines(DispV,hold$regional, lwd=3,col=grey(seq(0,.8, by=0.8/(length(Prop.Cont)-1))[i]))
-}
-#axis(1,at=c(seq(0.0002,0.0009,0.0001),seq(0.002,0.009,0.001),seq(0.02,0.09,0.01),seq(0.2,0.9,0.1)),tcl=-0.3,labels=F)
-axis(1,at=c(0.0001,0.001,0.01,0.1,1),labels=c("0.0001","0.001","0.01","0.1","1"))
-mtext("(c)", adj=-0.19)
-legend("topright",legend=Prop.Cont,col=grey(seq(0,.8, by=0.8/(length(Prop.Cont)-1))) ,lwd=3, bty='n', title="Functional\noverlap", inset=c(0,0.06),cex=0.95)
 
 #Figure 2####
+ggplot(Diversity.df,aes(x=Diversity,y=Function1,group=Scale, linetype=Scale))+
+  geom_path(aes(linetype=Scale))+
+  scale_linetype_manual(values=c(2,1))+
+  geom_point(aes(shape=Scale,color=as.factor(Dispersal)))+
+  scale_color_manual(values = rev(brewer.pal(10,"RdYlBu")),name="Dispersal")+
+  scale_shape_manual(values=c(17,19))
+  theme_bw(base_size = 15)+
+  removeGrid()+
+  ylab("Effective species diversity")
+
 par(mfrow=c(1,2),las=1, pty='s',mar=c(5,5,2,2))
 plot((RFun1*functions)~R.Div, type='b', pch="", xlab="Effective species diversity", ylab="Local community biomass", lwd=2,cex.lab=cex.labV)
 points(RFun1*functions~R.Div,col=rev(brewer.pal(length(DispV),name = "RdYlBu")),pch=19)
