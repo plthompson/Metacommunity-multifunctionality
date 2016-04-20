@@ -216,7 +216,7 @@ p1<-ggplot(Diversity.df,aes(x=Dispersal,y=Diversity,group=Scale, linetype=Scale)
   geom_line(size=1)+
   scale_x_log10(breaks=c(0.0001,0.001,0.01,0.1,1),labels=c("0.0001","0.001","0.01","0.1","1"))+
   theme_bw(base_size = 15)+
-  theme(legend.justification=c(0,0), legend.position=c(0,0.75))+
+  theme(legend.justification=c(0,1), legend.position=c(0,1))+
   removeGrid()+
   ylab("Effective species diversity")
 
@@ -236,25 +236,45 @@ p3<-ggplot(CV.df,aes(x=Dispersal,y=CV,group=interaction(Scale,Prop.Cont), linety
   theme_bw(base_size = 15)+
   guides(linetype=F)+
   removeGrid()+
-  theme(legend.justification=c(0,0), legend.position=c(0,0.5))+
+  theme(legend.justification=c(1,1), legend.position=c(1,1))+
   ylab("Individual function CV")
 
-pdf(file = "Figure 1.pdf",height = 4.5, width=15.5)
-plot_grid(p1,p2,p3, labels=c("(a)", "(b)","(c)"), ncol = 3, nrow = 1)
-dev.off()
+plot_grid(p1,p2,p3, labels=c("a)", "b)","c)"), ncol = 3, nrow = 1,label_size = 16)
+ggsave(file = "Figure 1.pdf",height = 5, width=15)
 
 
 
 #Figure 2####
-ggplot(Diversity.df,aes(x=Diversity,y=Function1,group=Scale, linetype=Scale))+
-  geom_path(aes(linetype=Scale))+
+Fig2a<-ggplot(Diversity.df,aes(x=Diversity,y=Function1,group=Scale, linetype=Scale,fill=as.factor(Dispersal),shape=Scale))+
+  geom_path()+
+  geom_point(size=3)+
+  scale_fill_manual(values = rev(brewer.pal(10,"RdYlBu")),name="Dispersal")+
+  scale_shape_manual(values=c(24,21))+
   scale_linetype_manual(values=c(2,1))+
-  geom_point(aes(shape=Scale,color=as.factor(Dispersal)))+
-  scale_color_manual(values = rev(brewer.pal(10,"RdYlBu")),name="Dispersal")+
-  scale_shape_manual(values=c(17,19))
   theme_bw(base_size = 15)+
   removeGrid()+
-  ylab("Effective species diversity")
+  xlab("Effective species diversity")+
+  ylab("Local community biomass")+
+  theme(legend.position='none')
+
+Thresh.df_sub1<-merge(Thresh.df_sub,Diversity.df,by = c("Dispersal","Scale"))
+
+Fig2b<-ggplot(arrange(filter(Thresh.df_sub1,Threshold==1,Prop.Cont==0.5),Dispersal),aes(x=Diversity,y=x, group=Scale, linetype=Scale, shape=Scale,fill=as.factor(Dispersal)))+
+  scale_fill_manual(values = rev(brewer.pal(10,"RdYlBu")),name="Dispersal")+
+  scale_shape_manual(values=c(24,21))+
+  geom_path()+
+  scale_linetype_manual(values=c(2,1))+
+  geom_point(size=3)+
+  theme_bw(base_size = 15)+
+  removeGrid()+
+  xlab("Effective species diversity")+
+  ylab("Multifunctionality")+
+  guides(fill=guide_legend(override.aes=list(colour=rev(brewer.pal(10,"RdYlBu")))))
+
+plot_grid(Fig2a,Fig2b, labels=c("a)", "b)"), ncol = 2, nrow = 1,rel_widths = c(1,1.3),label_size = 16)
+ggsave(file = "Figure 2.pdf",height = 5, width=10)
+
+
 
 par(mfrow=c(1,2),las=1, pty='s',mar=c(5,5,2,2))
 plot((RFun1*functions)~R.Div, type='b', pch="", xlab="Effective species diversity", ylab="Local community biomass", lwd=2,cex.lab=cex.labV)
@@ -271,7 +291,9 @@ legend("topleft",legend=c("Local", "Regional"), lwd=2, pch=c(17,19), lty=c(2,1),
 legend("bottomright", legend=DispV,col=rev(brewer.pal(length(DispV),name = "RdYlBu")), pch=19, bty='n', title= "Dispersal", cex=0.8)
 mtext("(b)",adj=-0.22, cex=1.2)
 
-#Figure 3####
+#Figure 4####
+Prop.patch.df$Thresh.text<-paste("Thresh = ",Prop.patch.df$Threshold, sep="")
+Prop.patch.df$Prop.text<-paste("Thresh = ",Prop.patch.df$Threshold, sep="")
 ggplot(summarize(group_by(Prop.patch.df,prop.cont,Dispersal,Functions,Threshold),Mean=mean(Proportion_patches),SD=sd(Proportion_patches)),aes(x=Functions,y=Mean,group=as.factor(Dispersal),color=as.factor(Dispersal)))+
   geom_errorbar(aes(ymin=Mean-SD,ymax=Mean+SD),width=0)+
   scale_color_manual(values = rev(brewer.pal(10,"RdYlBu")),name="Dispersal")+
@@ -283,7 +305,7 @@ ggplot(summarize(group_by(Prop.patch.df,prop.cont,Dispersal,Functions,Threshold)
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
   scale_y_continuous(breaks=seq(0,1,by=0.25))
 
-#Figure 4####
+#Figure 5####
 ggplot(data=Thresh.df_sub,aes(y=x,x = Dispersal,group=Threshold, color=Threshold))+
   geom_errorbar(aes(ymax=x+sd,ymin=x-sd, size=1.5),width=0.1)+
   geom_point()+
@@ -299,7 +321,6 @@ ggplot(data=Thresh.df_sub,aes(y=x,x = Dispersal,group=Threshold, color=Threshold
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
   theme(axis.title.x=element_text(vjust=-0.5),axis.title.y=element_text(vjust=1.5))
 
-#Supplementary figures
 Thresh.df_Both<-Reg_Multifunc_means
 Thresh.df_Both$Local<-Local_Multifunc_means$x
 Thresh.df_Both$Local_SD<-Local_Multifunc_means$SD
@@ -312,6 +333,7 @@ Thresh.df_Both<-Thresh.df_Both[Thresh.df_Both$Dispersal!=0,]
 
 ColV<-rev(brewer.pal(8,name = "RdYlBu"))
 
+#Figure 6####
 ggplot(data=Thresh.df_Both,aes(y=Local,x = x, fill=Dispersal))+
   geom_point(aes(size=Prop.Cont),pch=21)+
   facet_wrap(~Threshold,nrow = 2)+
@@ -329,6 +351,7 @@ ggplot(data=Thresh.df_Both,aes(y=Local,x = x, fill=Dispersal))+
   xlim(0,7)+
   coord_fixed(ratio=1)
 
+#Supplementary figures####
 Thresh.df_All$Div<-rep(L.Div,each=length(threshseq))
 Thresh.df_All$Div[Thresh.df_All$Scale=="Regional"]<-rep(rep(R.Div,each=length(threshseq)),length(Prop.Cont))
 
